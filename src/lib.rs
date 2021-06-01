@@ -12,14 +12,27 @@
 /// 	))
 /// );
 /// ```
-
-use bitcoincore_rpc::{bitcoin::BlockHash, Auth, Client, RpcApi};
-use jsonrpc_core::{Error as RpcError, ErrorCode as RpcErrorCode};
+use bitcoincore_rpc::{bitcoin::BlockHash, Auth};
+use jsonrpc_core::{Error as RpcError, Error, ErrorCode as RpcErrorCode};
 use jsonrpc_derive::rpc;
 
+use crate::bitcoin::hashes::_export::_core::str::FromStr;
+use crate::bitcoin::{Block, BlockHeader};
+
+pub use bitcoincore_rpc::{Client as BitcoinClient, RpcApi as BitcoinApi};
 pub use bitcoincore_rpc_json::*;
 
 pub struct BitcoinConfig<C>(C);
+
+impl<C> BitcoinConfig<C> {
+    fn into_inner(self) -> C {
+        self.0
+    }
+
+    fn new(inner: C) -> BitcoinConfig<C> {
+        BitcoinConfig(inner)
+    }
+}
 
 fn to_rpc_error(e: bitcoincore_rpc::Error) -> RpcError {
     RpcError {
@@ -29,15 +42,27 @@ fn to_rpc_error(e: bitcoincore_rpc::Error) -> RpcError {
     }
 }
 
+fn to_block_hash(block_hash: String) -> Result<BlockHash, RpcError> {
+    BlockHash::from_str(&block_hash).map_err(|e| RpcError {
+        code: RpcErrorCode::ParseError,
+        message: format!(
+            "cannot convert hash {} to BlockHash structure; {:?}",
+            block_hash, e
+        ),
+        data: None,
+    })
+}
+
 /// generate bitcoincore_rpc client
-pub fn new_client(btc_url: String, user: String, pass: String) -> BitcoinConfig<Client> {
+pub fn new_client(btc_url: String, user: String, pass: String) -> BitcoinConfig<BitcoinClient> {
     let auth = Auth::UserPass(user, pass);
-    let client = Client::new(btc_url, auth).unwrap();
+    let client = BitcoinClient::new(btc_url, auth).unwrap();
     BitcoinConfig(client)
 }
 
+/// this api is jsonrpc-core and jsonrpc-derive compatible.
 #[rpc]
-pub trait BitcoinApi {
+pub trait BitcoinJsonRPCApi {
     /// category wallet
     #[rpc(name = "getwalletinfo")]
     fn get_wallet_info(&self) -> Result<GetWalletInfoResult, RpcError>;
@@ -56,6 +81,9 @@ pub trait BitcoinApi {
     #[rpc(name = "getconnectioncount")]
     fn get_connection_count(&self) -> Result<usize, RpcError>;
 
+    #[rpc(name = "getpeerinfo")]
+    fn get_peer_info(&self) -> Result<Vec<GetPeerInfoResult>, RpcError>;
+
     #[rpc(name = "ping")]
     fn ping(&self) -> Result<(), RpcError>;
 
@@ -63,6 +91,18 @@ pub trait BitcoinApi {
     fn get_net_totals(&self) -> Result<GetNetTotalsResult, RpcError>;
 
     /// category blockchain
+    #[rpc(name = "getblock")]
+    fn get_block(&self, block_hash: String) -> Result<Block, RpcError>;
+
+    #[rpc(name = "getblockhash")]
+    fn get_block_hash(&self, heigh: u64) -> Result<BlockHash, RpcError>;
+
+    #[rpc(name = "getblockheader")]
+    fn get_block_header(&self, block_hash: String) -> Result<BlockHeader, RpcError>;
+
+    #[rpc(name = "getblockheaderinfo")]
+    fn get_block_header_info(&self, block_hash: String) -> Result<GetBlockHeaderResult, RpcError>;
+
     #[rpc(name = "getdifficulty")]
     fn get_difficulty(&self) -> Result<f64, RpcError>;
 
@@ -86,7 +126,7 @@ pub trait BitcoinApi {
 }
 
 //TODO: there must be a better way than this.
-impl<C: RpcApi> BitcoinApi for BitcoinConfig<C>
+impl<C: BitcoinApi> BitcoinJsonRPCApi for BitcoinConfig<C>
 where
     C: Send + Sync + 'static,
 {
@@ -110,12 +150,38 @@ where
         self.0.get_connection_count().map_err(to_rpc_error)
     }
 
+    fn get_peer_info(&self) -> Result<Vec<GetPeerInfoResult>, Error> {
+        self.0.get_peer_info().map_err(to_rpc_error)
+    }
+
     fn ping(&self) -> Result<(), RpcError> {
         self.0.ping().map_err(to_rpc_error)
     }
 
     fn get_net_totals(&self) -> Result<GetNetTotalsResult, RpcError> {
         self.0.get_net_totals().map_err(to_rpc_error)
+    }
+
+    fn get_block(&self, block_hash: String) -> Result<Block, RpcError> {
+        self.0
+            .get_block(&to_block_hash(block_hash)?)
+            .map_err(to_rpc_error)
+    }
+
+    fn get_block_hash(&self, height: u64) -> Result<BlockHash, RpcError> {
+        self.0.get_block_hash(height).map_err(to_rpc_error)
+    }
+
+    fn get_block_header(&self, block_hash: String) -> Result<BlockHeader, RpcError> {
+        self.0
+            .get_block_header(&to_block_hash(block_hash)?)
+            .map_err(to_rpc_error)
+    }
+
+    fn get_block_header_info(&self, block_hash: String) -> Result<GetBlockHeaderResult, RpcError> {
+        self.0
+            .get_block_header_info(&to_block_hash(block_hash)?)
+            .map_err(to_rpc_error)
     }
 
     fn get_difficulty(&self) -> Result<f64, RpcError> {
