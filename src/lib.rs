@@ -2,10 +2,10 @@
 
 /// how to use:
 /// ```
-/// use bitcoin_rpc_api::new_client;
+/// use bitcoin_rpc_api::{new_client, BitcoinJsonRPCApi};
 /// let mut io = jsonrpc_core::IoHandler::default();
 /// io.extend_with(
-/// 	BitcoinApi::to_delegate(new_client(
+/// 	BitcoinJsonRPCApi::to_delegate(new_client(
 /// 		std::env::var("BITCOIN_RPC_URL").expect("BITCOIN_RPC_URL must be set"),
 /// 		std::env::var("BITCOIN_RPC_USER").expect("BITCOIN_RPC_USER must be set"),
 /// 		std::env::var("BITCOIN_RPC_PASS").expect("BITCOIN_RPC_PASS must be set")
