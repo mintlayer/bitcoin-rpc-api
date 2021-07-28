@@ -1,7 +1,9 @@
-//! JSONRPC interface using bitcoincore-rpc's RpcApi trait to access bitcoin RPC methods.
-//
 // Copyright (c) 2021 RBB S.r.l
 // opensource@mintlayer.org
+// Author(s): C. Yap
+//
+//! JSONRPC interface using bitcoincore-rpc's RpcApi trait to access bitcoin RPC methods.
+//
 //
 /// how to use:
 /// ```
